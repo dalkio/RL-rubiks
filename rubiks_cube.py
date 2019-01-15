@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import random
 import collections
+from itertools import product
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import rubiks_cube_config as rc_conf
@@ -31,8 +32,10 @@ class RubiksCube:
         self.connexions = rc_conf.connexions
         self.sides = rc_conf.sides
         self.directions = rc_conf.directions
+        self.actions = [side+direction for side, direction in product(self.sides, self.directions)]
         self.index_colors = {color: index for index, color in enumerate(self.colors)}
         self.index_sides = {side: index for index, side in enumerate(self.sides)}
+        self.index_actions = {action: index for index, action in enumerate(self.actions)}
         if cube is None:
             self.cube = self._construct_cube()
         else:
