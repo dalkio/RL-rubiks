@@ -7,9 +7,10 @@ from keras.layers import Dense
 from keras.optimizers import Adam
 
 class DQNAgent:
-    def __init__(self, environment, action_type,
+    def __init__(self, environment_type, action_type,
                  lr=1e-3, hidden_size=24, gamma=0.95, memory_size=1e6, batch_size=20, 
-                 exploration_max=1.0, exploration_min=1e-2, exploration_decay=0.995):
+                 exploration_max=1.0, exploration_min=1e-2, exploration_decay=0.995,
+                 verbose=1):
         # Exploration values
         self.exploration_max = exploration_max
         self.exploration_min = exploration_min
@@ -19,11 +20,12 @@ class DQNAgent:
         assert isclass(action_type)
         self.action_type = action_type
         # Environment properties
-        self.environment = environment
-        self.state_space = len(environment.state.flatten())
-        self.action_space = len(environment.actions)
+        self.environment_type = environment_type
+        self.environment = None
+        self.state_space = None
+        self.action_space = None
         # Q stack memory
-        assert memory >= batch_size
+        assert memory_size >= batch_size
         self.memory = deque(maxlen=int(memory_size))
         # Discount factor
         self.gamma = gamma
@@ -31,7 +33,11 @@ class DQNAgent:
         self.lr = lr
         self.hidden_size = hidden_size
         self.batch_size = batch_size
-        self.model = self._create_model()
+        self.model = None
+        # Verbose
+        self.verbose = verbose
+        # Initialization
+        self._initialize()
 
     def _create_model(self):
         model = Sequential()
@@ -40,6 +46,12 @@ class DQNAgent:
         model.add(Dense(self.action_space, activation="linear"))
         model.compile(loss="mse", optimizer=Adam(lr=self.lr))
         return model
+    
+    def _initialize(self):
+        self.environment = self.environment_type(verbose=self.verbose>1)
+        self.state_space = len(self.environment.state.flatten())
+        self.action_space = len(self.environment.actions)
+        self.model = self._create_model()
     
     def _exploration_update(self):
         self.exploration_rate = max(self.exploration_min, self.exploration_rate * self.exploration_decay)
@@ -54,7 +66,7 @@ class DQNAgent:
         return np.argmax(np.ravel(q_values))
 
     def experience_replay(self):
-        batch = random.sample(self.memory, self.batch_size)
+        batch = random.sample(self.memory, min(self.batch_size, len(self.memory)))
         for state, action, reward, state_next, terminal in batch:
             q_update = reward
             if not terminal:
@@ -62,7 +74,7 @@ class DQNAgent:
             q_values = self.model.predict(state)
             q_values[0][action] = q_update
             self.model.fit(state, q_values, verbose=0)
-        self.exploration_update()
+        self._exploration_update()
         
     def train(self, episodes=100, max_step=1000, display_frequence=100):
         for episode in range(episodes):
@@ -75,15 +87,16 @@ class DQNAgent:
                 state_next_flat = np.reshape(self.environment.state, [1, self.state_space])
                 self.remember(state_flat, action_index, reward, state_next_flat, terminal)
                 state_flat = state_next_flat
-                if terminal:
-                    print("Run: {0}, exploration: {1}, score: {2}".format(
-                            str(episode), str(self.exploration_rate), str(step)
+                if self.verbose:
+                    if terminal:
+                        print("Run: {0}, exploration: {1}, score: {2}".format(
+                                str(episode), str(self.exploration_rate), str(step)
+                            )
                         )
-                    )
-                    break
+                        break
+                    if step%display_frequence == 0:
+                        print("Step: {0}, reward: {1}".format(
+                                step, reward
+                            )
+                        )
                 self.experience_replay()
-                if step%display_frequence == 0:
-                    print("Step: {0}, reward: {1}".format(
-                            step, reward
-                        )
-                    )
