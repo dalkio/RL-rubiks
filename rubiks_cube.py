@@ -26,7 +26,7 @@ class RubiksAction:
         return collections.namedtuple('Action', 'side direction')(*tuple(action)) 
 
 class RubiksCube:
-    def __init__(self, cube=None, verbose=True, shuffle=True):
+    def __init__(self, cube=None, verbose=False, shuffle=True):
         self.dim = rc_conf.dim
         self.colors = rc_conf.colors
         self.connexions = rc_conf.connexions
@@ -47,6 +47,10 @@ class RubiksCube:
         self.verbose = verbose
         if shuffle and cube is None:
             self._shuffle_cube()
+    
+    @property
+    def state(self):
+        return self.cube
 
     def _construct_cube(self, verbose=True):
         cube = np.empty((len(self.colors), self.dim, self.dim), dtype='int64')
