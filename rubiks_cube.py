@@ -128,16 +128,18 @@ class RubiksCube:
         return np.all([np.all(self.cube[i]==i) for i in self.index_colors.values()])
     
     def reset(self, shuffle=True):
-        self.cube = self._construct_cube()
+        self.state = self._construct_cube()
         if shuffle:
             self._shuffle_cube()
+        return self.state
             
     def step(self, action):
         assert isinstance(action, RubiksAction) and action.action is not None
         self._rotate(action.action, verbose=self.verbose)
+        state = self.state
         reward = self._get_reward()
         done = self.is_resolved()
-        return reward, done
+        return state, reward, done, None
     
     def render(self):
         fig = plt.figure()

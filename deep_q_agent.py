@@ -1,5 +1,7 @@
 import random
 import numpy as np
+import gym
+from gym import envs
 from inspect import isclass
 from collections import deque
 from keras.models import Sequential
@@ -7,7 +9,7 @@ from keras.layers import Dense
 from keras.optimizers import Adam
 
 class DQNAgent:
-    def __init__(self, environment_type, action_type,
+    def __init__(self, environment_type=None, action_type=None, gym_environment=None,
                  lr=1e-3, hidden_size=24, gamma=0.95, memory_size=1e6, batch_size=20, 
                  exploration_max=1.0, exploration_min=1e-2, exploration_decay=0.995,
                  verbose=1):
@@ -16,11 +18,20 @@ class DQNAgent:
         self.exploration_min = exploration_min
         self.exploration_decay = exploration_decay
         self.exploration_rate = self.exploration_max
-        # Action type for the environment
-        assert isclass(action_type)
-        self.action_type = action_type
-        # Environment properties
-        self.environment_type = environment_type
+        self.gym_environment = gym_environment
+        # Gym environments
+        if isinstance(gym_environment, str):
+            assert gym_environment in {envspec.id for envspec in envs.registry.all()}
+            self.action_type = None
+            self.environment_type = None
+        # Custom environments
+        else:
+            # Action type for the environment
+            assert isclass(action_type)
+            self.action_type = action_type
+            # Environment properties
+            assert isclass(environment_type)
+            self.environment_type = environment_type
         self.environment = None
         self.state_space = None
         self.action_space = None
@@ -48,9 +59,14 @@ class DQNAgent:
         return model
     
     def _initialize(self):
-        self.environment = self.environment_type(verbose=self.verbose>1)
-        self.state_space = len(self.environment.state.flatten())
-        self.action_space = len(self.environment.actions)
+        if self.environment_type is None:
+            self.environment = gym.make(self.gym_environment)
+            self.state_space = self.environment.observation_space.shape[0]
+            self.action_space = self.environment.action_space.n
+        else:
+            self.environment = self.environment_type(verbose=self.verbose>1)
+            self.state_space = len(self.environment.state.flatten())
+            self.action_space = len(self.environment.actions)
         self.model = self._create_model()
     
     def _exploration_update(self):
@@ -70,7 +86,7 @@ class DQNAgent:
         for state, action, reward, state_next, terminal in batch:
             q_update = reward
             if not terminal:
-                q_update = (reward + self.gamma * np.amax(self.model.predict(state_next)[0]))
+                q_update = (reward + self.gamma * np.max(np.ravel(self.model.predict(state_next))))
             q_values = self.model.predict(state)
             q_values[0][action] = q_update
             self.model.fit(state, q_values, verbose=0)
@@ -78,13 +94,16 @@ class DQNAgent:
         
     def train(self, episodes=100, max_step=1000, display_frequence=100):
         for episode in range(episodes):
-            self.environment.reset()
-            state_flat = np.reshape(self.environment.state, [1, self.state_space])
+            state = self.environment.reset()
+            state_flat = np.reshape(state, [1, self.state_space])
             for step in range(max_step):
                 action_index = self.predict(state_flat)
-                action = self.action_type(self.environment.actions[action_index])
-                reward, terminal = self.environment.step(action)
-                state_next_flat = np.reshape(self.environment.state, [1, self.state_space])
+                if self.action_type is None:
+                    action = action_index
+                else:
+                    action = self.action_type(self.environment.actions[action_index])
+                state_next, reward, terminal, _ = self.environment.step(action)
+                state_next_flat = np.reshape(state_next, [1, self.state_space])
                 self.remember(state_flat, action_index, reward, state_next_flat, terminal)
                 state_flat = state_next_flat
                 if self.verbose:
