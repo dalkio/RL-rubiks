@@ -52,6 +52,10 @@ class RubiksCube:
     def state(self):
         return self.cube
 
+    @property
+    def state_one_hot(self):
+        return (np.arange(len(self.colors)) == self.cube[..., None]).astype(int)
+
     def _construct_cube(self, verbose=True):
         cube = np.empty((len(self.colors), self.dim, self.dim), dtype='int64')
         for index in self.index_colors.values():
@@ -122,21 +126,22 @@ class RubiksCube:
             print('Cube shuffled {0} times'.format(n))
             
     def _get_reward(self):
-        return np.sum([np.sum(self.cube[i]==i) for i in self.index_colors.values()])
+        resolved = np.all([np.all(self.cube[i]==i) for i in self.index_colors.values()])
+        return 1 if resolved else -1
 
     def is_resolved(self):
-        return np.all([np.all(self.cube[i]==i) for i in self.index_colors.values()])
+        return True if self._get_reward() == 1 else False
     
     def reset(self, shuffle=True):
-        self.state = self._construct_cube()
+        self.cube = self._construct_cube()
         if shuffle:
             self._shuffle_cube()
-        return self.state
+        return self.cube
             
     def step(self, action):
         assert isinstance(action, RubiksAction) and action.action is not None
         self._rotate(action.action, verbose=self.verbose)
-        state = self.state
+        state = self.cube
         reward = self._get_reward()
         done = self.is_resolved()
         return state, reward, done, None
