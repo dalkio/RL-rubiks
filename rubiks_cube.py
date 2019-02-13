@@ -36,6 +36,8 @@ class RubiksCube:
         self.index_colors = {color: index for index, color in enumerate(self.colors)}
         self.index_sides = {side: index for index, side in enumerate(self.sides)}
         self.index_actions = {action: index for index, action in enumerate(self.actions)}
+        self.verbose = verbose
+        self.counter = 0
         if cube is None:
             self.cube = self._construct_cube()
         else:
@@ -43,8 +45,6 @@ class RubiksCube:
                 self.cube = cube.copy()
             else:
                 print('Incorrect cube format!')
-        self.counter = 0
-        self.verbose = verbose
         if shuffle and cube is None:
             self._shuffle_cube()
     
