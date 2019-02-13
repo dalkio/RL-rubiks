@@ -56,11 +56,11 @@ class RubiksCube:
     def state_one_hot(self):
         return (np.arange(len(self.colors)) == self.cube[..., None]).astype(int)
 
-    def _construct_cube(self, verbose=True):
+    def _construct_cube(self):
         cube = np.empty((len(self.colors), self.dim, self.dim), dtype='int64')
         for index in self.index_colors.values():
             cube[index, :, :] = index
-        if verbose:
+        if self.verbose:
             print('Cube initialized!')
         return cube
 
