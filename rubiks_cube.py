@@ -116,18 +116,18 @@ class RubiksCube:
         self.counter += 1
         if verbose:
             print('{0}: {1} done, reward={2}'.format(str(self.counter), action, self._get_reward()))
-
-    def _shuffle_cube(self, n=100):
+            
+    def _get_reward(self):
+        resolved = np.all([np.all(self.cube[i]==i) for i in self.index_colors.values()])
+        return 1 if resolved else -1
+    
+    def shuffle_cube(self, n=100):
         for i in range(n):
             random_action = RubiksAction()
             self._rotate(random_action.action, verbose=False)
             self.counter = 0
         if self.verbose:
             print('Cube shuffled {0} times'.format(n))
-            
-    def _get_reward(self):
-        resolved = np.all([np.all(self.cube[i]==i) for i in self.index_colors.values()])
-        return 1 if resolved else -1
 
     def is_resolved(self):
         return True if self._get_reward() == 1 else False
