@@ -70,7 +70,7 @@ class ADI(object):
         self.logger.info("Generating dataset...")
         X, weights = [], []
         for iteration in range(self.l):
-            rubiks_cube = RubiksCube(shuffle=self.shuffle, verbose=False)
+            rubiks_cube = RubiksCube(shuffle=False, verbose=False)
             for shuffle in range(self.k):
                 rubiks_cube.shuffle_cube(n=1)
                 weight = 1 / (shuffle + 1)
@@ -88,7 +88,7 @@ class ADI(object):
         return X, weights
 
     @staticmethod
-    def _design_model(self) -> Model:
+    def _design_model() -> Model:
         rubiks_cube = RubiksCube()
 
         inputs = Input(shape=rubiks_cube.state_one_hot.shape, name='input')
@@ -116,16 +116,16 @@ class ADI(object):
         :param epochs_per_batch: Number of epochs for one batch
         """
         self.logger.info("Training model...")
+        rubiks_cube = RubiksCube()
         for batch_number in range(batches_number):
             self.logger.info("Batch number: {0}".format(batch_number+1))
             Y_p, Y_v = [], []
             batch_indexes = np.random.choice(range(len(self.X)), size=batch_size, replace=False)
             X_batch, weights_batch = self.X[batch_indexes], self.weights[batch_indexes]
             for iteration, X_i in enumerate(X_batch):
-                rubiks_cube = RubiksCube(X_i)
                 rewards_i, values_i = [], []
                 for action in rubiks_cube.actions:
-                    rubiks_cube_copy = RubiksCube(rubiks_cube.cube)
+                    rubiks_cube_copy = RubiksCube(cube=X_i)
                     _, reward_a, _, _ = rubiks_cube_copy.step(RubiksAction(action))
                     (v_x_i_a, p_x_i_a) = self.model.predict(np.expand_dims(rubiks_cube_copy.state_one_hot, axis=0))
                     rewards_i.append(reward_a)

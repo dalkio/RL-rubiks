@@ -26,7 +26,7 @@ class RubiksAction:
         return collections.namedtuple('Action', 'side direction')(*tuple(action)) 
 
 class RubiksCube:
-    def __init__(self, cube=None, verbose=False, shuffle=True):
+    def __init__(self, cube=None, verbose=False, shuffle=False):
         self.dim = rc_conf.dim
         self.colors = rc_conf.colors
         self.connexions = rc_conf.connexions
@@ -43,10 +43,12 @@ class RubiksCube:
         else:
             if isinstance(cube, np.ndarray) and cube.shape == (len(self.colors), self.dim, self.dim):
                 self.cube = cube.copy()
+            elif isinstance(cube, np.ndarray) and cube.shape == (len(self.colors), self.dim, self.dim, len(self.colors)):
+                self.cube = self.from_one_hot_cube(cube)
             else:
                 print('Incorrect cube format!')
-        if shuffle and cube is None:
-            self._shuffle_cube()
+        if shuffle:
+            self.shuffle_cube()
     
     @property
     def state(self):
@@ -55,6 +57,11 @@ class RubiksCube:
     @property
     def state_one_hot(self):
         return (np.arange(len(self.colors)) == self.cube[..., None]).astype(int)
+    
+    @staticmethod
+    def from_one_hot_cube(cube):
+        assert isinstance(cube, np.ndarray)
+        return np.argmax(cube, axis=-1)
 
     def _construct_cube(self):
         cube = np.empty((len(self.colors), self.dim, self.dim), dtype='int64')
@@ -122,7 +129,7 @@ class RubiksCube:
         return 1 if resolved else -1
     
     def shuffle_cube(self, n=100):
-        for i in range(n):
+        for _ in range(n):
             random_action = RubiksAction()
             self._rotate(random_action.action, verbose=False)
             self.counter = 0
@@ -135,7 +142,7 @@ class RubiksCube:
     def reset(self, shuffle=True):
         self.cube = self._construct_cube()
         if shuffle:
-            self._shuffle_cube()
+            self.shuffle_cube()
         return self.cube
             
     def step(self, action):
