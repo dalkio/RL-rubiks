@@ -12,12 +12,16 @@ from rubiks_cube import RubiksCube, RubiksAction
 
 class ADI(object):
     def __init__(self, k: int = 25, l: int = 40000, load_files: Tuple[str, str] = None,
+                 save_dataset: bool = True, save_model: bool = True,
                  verbose: bool = True, shuffle: bool = True) -> None:
         """
         Autodidactic Iteration Algorithm for Rubik's Cube solving using reinforcement learning
         https://arxiv.org/pdf/1805.07470.pdf
         :param k: Number of scrambles from the solved state to generate a sequence of cubes
         :param l: Number of sequences generated
+        :param load_files: Tuple of dataset and weights filenames
+        :param save_dataset: Boolean for saving or not the created dataset
+        :param save_model: Boolean for saving or not the trained model
         :param verbose: Verbosity parameter
         :param shuffle: Dataset shuffle parameter
         """
@@ -108,6 +112,13 @@ class ADI(object):
         model = Model(inputs=inputs, outputs=[v, p])
         model.compile(optimizer='rmsprop', loss=losses)
         return model
+    
+    def save_trained_model(self, filename) -> None:
+        model_name_json, model_name_h5 = filename + '.json', filename + '.h5'
+        model_json = self.model.to_json()
+        with open(model_name_json, "w") as json_file:
+            json_file.write(model_json)
+        self.model.save_weights(model_name_h5)
 
     def train(self, batch_size: int = 1000, batches_number: int = 5, epochs_per_batch: int = 1) -> None:
         """
@@ -141,3 +152,6 @@ class ADI(object):
                 sample_weight={'policy_output': weights_batch, 'value_output': weights_batch},
                 epochs=epochs_per_batch
             )
+            if batch_number%10 == 0 and batch_number != 0:
+                filename = "data/model_k{0}_l{1}_iter{2}".format(self.k, self.l, batch_number)
+                self.save_trained_model(filename)
