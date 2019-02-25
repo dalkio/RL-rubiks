@@ -7,6 +7,7 @@ from typing import Tuple
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 from keras.layers import Input, Dense, Flatten
 from keras.models import Model
+from keras.models import model_from_json
 from rubiks_cube import RubiksCube, RubiksAction
 
 
@@ -28,10 +29,14 @@ class ADI(object):
         self.k = k
         self.l = l
         self.load_files = load_files
+        self.save_dataset = save_dataset
+        self.save_model = save_model
         self.verbose = verbose
         self.shuffle = shuffle
+
         self.X = None
         self.weights = None
+        self.current_iteration = 0
 
         self.logger = self._create_logger()
         if self.load_files:
@@ -114,12 +119,34 @@ class ADI(object):
         model.compile(optimizer='rmsprop', loss=losses)
         return model
     
-    def save_trained_model(self, filename) -> None:
+    def save_trained_model(self, filename: str) -> None:
+        """
+        Save the trained model in local
+        :param filename: Root filename for the config stored as json, and the model itself stored as h5
+        :return: None
+        """
         model_name_json, model_name_h5 = filename + '.json', filename + '.h5'
         model_json = self.model.to_json()
         with open(model_name_json, "w") as json_file:
             json_file.write(model_json)
         self.model.save_weights(model_name_h5)
+        
+    def load_trained_model(self, filename: str) -> None:
+        """
+        Save the trained model in local
+        :param filename: Root filename for the config stored as json, and the model itself stored as h5
+        :return: None
+        """
+        model_name_json, model_name_h5 = 'data/' + filename + '.json', 'data/' + filename + '.h5'
+        with open(model_name_json, 'r') as json_file:
+            loaded_model = model_from_json(json_file.read())
+        loaded_model.load_weights(model_name_h5)
+        losses = {
+            'value_output': 'mean_squared_error',
+            'policy_output': 'categorical_crossentropy'
+        }
+        loaded_model.compile(optimizer='rmsprop', loss=losses)
+        self.model = loaded_model
 
     def train(self, batch_size: int = 1000, batches_number: int = 5, epochs_per_batch: int = 1,
               save_frequency: int = 10) -> None:
@@ -131,8 +158,9 @@ class ADI(object):
         """
         self.logger.info("Training model...")
         rubiks_cube = RubiksCube()
-        for batch_number in range(batches_number):
-            self.logger.info("Batch number: {0}".format(batch_number+1))
+        for _ in range(batches_number):
+            self.current_iteration += 1
+            self.logger.info("Batch number: {0}".format(self.current_iteration))
             Y_p, Y_v = [], []
             batch_indexes = np.random.choice(range(len(self.X)), size=batch_size, replace=False)
             X_batch, weights_batch = self.X[batch_indexes], self.weights[batch_indexes]
@@ -156,6 +184,6 @@ class ADI(object):
                 epochs=epochs_per_batch
             )
             if self.save_model:
-                if (batch_number+1)%save_frequency == 0:
-                    filename = "data/model_k{0}_l{1}_iter{2}".format(self.k, self.l, batch_number+1)
+                if self.current_iteration%save_frequency == 0:
+                    filename = "data/model_k{0}_l{1}_iter{2}".format(self.k, self.l, self.current_iteration)
                     self.save_trained_model(filename)
