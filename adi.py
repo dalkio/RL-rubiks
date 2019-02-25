@@ -120,11 +120,13 @@ class ADI(object):
             json_file.write(model_json)
         self.model.save_weights(model_name_h5)
 
-    def train(self, batch_size: int = 1000, batches_number: int = 5, epochs_per_batch: int = 1) -> None:
+    def train(self, batch_size: int = 1000, batches_number: int = 5, epochs_per_batch: int = 1,
+              save_frequency: int = 10) -> None:
         """
         :param batch_size: Number of cubes for a batch for one pass
         :param batches_number: Number of total epochs
         :param epochs_per_batch: Number of epochs for one batch
+        :param save_frequency: Number of batches between each saving
         """
         self.logger.info("Training model...")
         rubiks_cube = RubiksCube()
@@ -152,6 +154,6 @@ class ADI(object):
                 sample_weight={'policy_output': weights_batch, 'value_output': weights_batch},
                 epochs=epochs_per_batch
             )
-            if batch_number%10 == 0 and batch_number != 0:
+            if batch_number%save_frequency == 0 and batch_number != 0:
                 filename = "data/model_k{0}_l{1}_iter{2}".format(self.k, self.l, batch_number)
                 self.save_trained_model(filename)
