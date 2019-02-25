@@ -69,8 +69,6 @@ class ADI(object):
         return k, l, X, weights
 
     def _generate_dataset(self) -> Tuple[np.ndarray, np.ndarray]:
-        samples_file = "data/scrambled_cubes_k{0}_l{1}.npy".format(self.k, self.l)
-        weights_file = "data/weights_k{0}_l{1}.npy".format(self.k, self.l)
         self.logger.info("Generating dataset...")
         X, weights = [], []
         for iteration in range(self.l):
@@ -87,8 +85,11 @@ class ADI(object):
             random_indexes = np.random.permutation(range(self.l * self.k))
             X, weights = X[random_indexes], weights[random_indexes]
         os.makedirs('data', exist_ok=True)
-        np.save(samples_file, X)
-        np.save(weights_file, weights)
+        if self.save_dataset:
+            samples_file = "data/scrambled_cubes_k{0}_l{1}.npy".format(self.k, self.l)
+            weights_file = "data/weights_k{0}_l{1}.npy".format(self.k, self.l)
+            np.save(samples_file, X)
+            np.save(weights_file, weights)
         return X, weights
 
     @staticmethod
@@ -154,6 +155,7 @@ class ADI(object):
                 sample_weight={'policy_output': weights_batch, 'value_output': weights_batch},
                 epochs=epochs_per_batch
             )
-            if batch_number%save_frequency == 0 and batch_number != 0:
-                filename = "data/model_k{0}_l{1}_iter{2}".format(self.k, self.l, batch_number)
-                self.save_trained_model(filename)
+            if self.save_model:
+                if (batch_number+1)%save_frequency == 0:
+                    filename = "data/model_k{0}_l{1}_iter{2}".format(self.k, self.l, batch_number+1)
+                    self.save_trained_model(filename)
