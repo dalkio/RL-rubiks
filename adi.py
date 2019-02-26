@@ -132,10 +132,11 @@ class ADI(object):
             json_file.write(model_json)
         self.model.save_weights(model_name_h5)
         
-    def load_trained_model(self, filename: str) -> None:
+    def load_trained_model(self, filename: str, current_iteration: int) -> None:
         """
         Save the trained model in local
         :param filename: Root filename for the config stored as json, and the model itself stored as h5
+        :param current_iteration: Current iteration on the model
         :return: None
         """
         model_name_json, model_name_h5 = 'data/' + filename + '.json', 'data/' + filename + '.h5'
@@ -148,6 +149,7 @@ class ADI(object):
         }
         loaded_model.compile(optimizer='rmsprop', loss=losses)
         self.model = loaded_model
+        self.current_iteration = current_iteration
 
     def train(self, batch_size: int = 1000, batches_number: int = 5, epochs_per_batch: int = 1,
               save_frequency: int = 10) -> None:
