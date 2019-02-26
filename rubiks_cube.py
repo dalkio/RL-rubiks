@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 import random
 import collections
 from itertools import product
@@ -7,15 +6,24 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import rubiks_cube_config as rc_conf
 
+
 class RubiksAction:
     def __init__(self, action=None):
         self.sides = rc_conf.sides
         self.directions = rc_conf.directions
         self.action = self._load_action(action) if action is not None else self._random_action()
+
+    def __eq__(self, other):
+        if type(other) is type(self):
+            return self.__dict__ == other.__dict__
+        return False
+
+    def __str__(self):
+        return self.action.side + self.action.direction
             
     def _load_action(self, action):
         if (isinstance(action, str) and len(action) == 2 and
-        action[0] in self.sides and action[1] in self.directions):
+                action[0] in self.sides and action[1] in self.directions):
             return collections.namedtuple('Action', 'side direction')(*tuple(action)) 
         else:
             print('Unknown action!')
@@ -23,7 +31,13 @@ class RubiksAction:
 
     def _random_action(self):
         action = random.choice(self.sides) + random.choice(self.directions)
-        return collections.namedtuple('Action', 'side direction')(*tuple(action)) 
+        return collections.namedtuple('Action', 'side direction')(*tuple(action))
+
+    def get_inverse_action(self):
+        inverse_side = self.action.side
+        inverse_direction = 'd' if self.action.direction == 'i' else 'i'
+        return RubiksAction(action=inverse_side+inverse_direction)
+
 
 class RubiksCube:
     def __init__(self, cube=None, verbose=False, shuffle=False):
@@ -63,6 +77,13 @@ class RubiksCube:
         assert isinstance(cube, np.ndarray)
         return np.argmax(cube, axis=-1)
 
+    @staticmethod
+    def _rotate_helper(matrix, direction):
+        if direction == 'd':
+            return np.rot90(matrix, k=1)
+        elif direction == 'i':
+            return np.rot90(matrix, k=3)
+
     def _construct_cube(self):
         cube = np.empty((len(self.colors), self.dim, self.dim), dtype='int64')
         for index in self.index_colors.values():
@@ -70,12 +91,6 @@ class RubiksCube:
         if self.verbose:
             print('Cube initialized!')
         return cube
-
-    def _rotate_helper(self, matrix, direction):
-        if direction == 'd':
-            return np.rot90(matrix, k=1)
-        elif direction == 'i':
-            return np.rot90(matrix, k=3)
         
     def _edge_translation(self, side, side_matrix_a, side_matrix_b, edge_a, edge_b, 
                           return_array=True, input_array=None):

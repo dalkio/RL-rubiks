@@ -2,6 +2,7 @@ import logging
 import sys
 import os
 import re
+import random
 import numpy as np
 from typing import Tuple
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -118,7 +119,7 @@ class ADI(object):
         model = Model(inputs=inputs, outputs=[v, p])
         model.compile(optimizer='rmsprop', loss=losses)
         return model
-    
+
     def save_trained_model(self, filename: str) -> None:
         """
         Save the trained model in local
@@ -187,3 +188,20 @@ class ADI(object):
                 if self.current_iteration%save_frequency == 0:
                     filename = "data/model_k{0}_l{1}_iter{2}".format(self.k, self.l, self.current_iteration)
                     self.save_trained_model(filename)
+
+    def estimate_naive_accuracy(self, depth, iterations):
+        score = 0
+        for iteration in range(iterations):
+            rubiks = RubiksCube(shuffle=False)
+            inverse_previous_action_idx = None
+            for depth_i in range(depth):
+                action_idx = random.choice(
+                    [idx for idx in range(len(rubiks.actions)) if idx != inverse_previous_action_idx]
+                )
+                action = RubiksAction(rubiks.actions[action_idx])
+                rubiks.step(action)
+                inverse_previous_action_idx = rubiks.index_actions[str(action.get_inverse_action())]
+            (_, p) = self.model.predict(np.expand_dims(rubiks.state_one_hot, axis=0))
+            prediction = np.argmax(p)
+            score += prediction == inverse_previous_action_idx
+        return score/iterations
