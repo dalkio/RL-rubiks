@@ -1,4 +1,3 @@
-dim = 3
 colors = ('blue', 'green', 'orange', 'red', 'white', 'yellow')
 sides = ('r', 'l', 'u', 'd', 'f', 'b')
 directions = ('d', 'i')

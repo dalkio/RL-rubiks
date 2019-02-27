@@ -40,12 +40,12 @@ class RubiksAction:
 
 
 class RubiksCube:
-    def __init__(self, cube=None, verbose=False, shuffle=False):
-        self.dim = rc_conf.dim
+    def __init__(self, dim=3, cube=None, verbose=False, shuffle=False):
         self.colors = rc_conf.colors
         self.connexions = rc_conf.connexions
         self.sides = rc_conf.sides
         self.directions = rc_conf.directions
+        self.dim = dim
         self.actions = [side+direction for side, direction in product(self.sides, self.directions)]
         self.index_colors = {color: index for index, color in enumerate(self.colors)}
         self.index_sides = {side: index for index, side in enumerate(self.sides)}
@@ -55,9 +55,13 @@ class RubiksCube:
         if cube is None:
             self.cube = self._construct_cube()
         else:
-            if isinstance(cube, np.ndarray) and cube.shape == (len(self.colors), self.dim, self.dim):
+            if isinstance(cube, np.ndarray) and cube.shape == (
+                    len(self.colors), self.dim, self.dim
+            ):
                 self.cube = cube.copy()
-            elif isinstance(cube, np.ndarray) and cube.shape == (len(self.colors), self.dim, self.dim, len(self.colors)):
+            elif isinstance(cube, np.ndarray) and cube.shape == (
+                    len(self.colors), self.dim, self.dim, len(self.colors)
+            ):
                 self.cube = self.from_one_hot_cube(cube)
             else:
                 print('Incorrect cube format!')
@@ -173,35 +177,35 @@ class RubiksCube:
         ax = fig.add_subplot(111, projection='3d')
         r = list(range(self.dim+1))
         X, Y = np.meshgrid(r, r[::-1])
-        zero, three = np.zeros(4).reshape(2, 2), np.ones(4).reshape(2, 2) * 3
+        zero_mat, dim_mat = np.zeros(4).reshape(2, 2), np.ones(4).reshape(2, 2) * self.dim
         edge_color, edge_width = 'black', 3
         for x_idx in range(X.shape[0]-1):
             for y_idx in range(X.shape[1]-1):
                 x = X[x_idx:x_idx+2, y_idx:y_idx+2]
                 y = Y[x_idx:x_idx+2, y_idx:y_idx+2]
-                ax.plot_wireframe(three, x, y, linewidth=edge_width, color=edge_color)
+                ax.plot_wireframe(dim_mat, x, y, linewidth=edge_width, color=edge_color)
                 ax.plot_surface(
-                    three, x, y, color=self.colors[self.cube[0][x_idx][y_idx]]
+                    dim_mat, x, y, color=self.colors[self.cube[0][x_idx][y_idx]]
                 )
-                ax.plot_wireframe(zero, x, y, linewidth=edge_width, color=edge_color)
+                ax.plot_wireframe(zero_mat, x, y, linewidth=edge_width, color=edge_color)
                 ax.plot_surface(
-                    zero, x, y, color=self.colors[np.flip(self.cube[1], axis=1)[x_idx][y_idx]]
+                    zero_mat, x, y, color=self.colors[np.flip(self.cube[1], axis=1)[x_idx][y_idx]]
                 )
-                ax.plot_wireframe(x, y, three, linewidth=edge_width, color=edge_color)
+                ax.plot_wireframe(x, y, dim_mat, linewidth=edge_width, color=edge_color)
                 ax.plot_surface(
-                    x, y, three, color=self.colors[self.cube[2][x_idx][y_idx]]
+                    x, y, dim_mat, color=self.colors[self.cube[2][x_idx][y_idx]]
                 )
-                ax.plot_wireframe(x, y, zero, linewidth=edge_width, color=edge_color)
+                ax.plot_wireframe(x, y, zero_mat, linewidth=edge_width, color=edge_color)
                 ax.plot_surface(
-                    x, y, zero, color=self.colors[np.flip(self.cube[3], axis=0)[x_idx][y_idx]]
+                    x, y, zero_mat, color=self.colors[np.flip(self.cube[3], axis=0)[x_idx][y_idx]]
                 )
-                ax.plot_wireframe(x, zero, y, linewidth=edge_width, color=edge_color)
+                ax.plot_wireframe(x, zero_mat, y, linewidth=edge_width, color=edge_color)
                 ax.plot_surface(
-                    x, zero, y, color=self.colors[self.cube[4][x_idx][y_idx]]
+                    x, zero_mat, y, color=self.colors[self.cube[4][x_idx][y_idx]]
                 )
-                ax.plot_wireframe(x, three, y, linewidth=edge_width, color=edge_color)
+                ax.plot_wireframe(x, dim_mat, y, linewidth=edge_width, color=edge_color)
                 ax.plot_surface(
-                    x, three, y, color=self.colors[np.flip(self.cube[5], axis=1)[x_idx][y_idx]]
+                    x, dim_mat, y, color=self.colors[np.flip(self.cube[5], axis=1)[x_idx][y_idx]]
                 )
         ax._axis3don = False
         plt.show()
