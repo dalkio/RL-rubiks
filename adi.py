@@ -167,7 +167,7 @@ class ADI(object):
             Y_p, Y_v = [], []
             batch_indexes = np.random.choice(range(len(self.X)), size=batch_size, replace=False)
             X_batch, weights_batch = self.X[batch_indexes], self.weights[batch_indexes]
-            for iteration, X_i in enumerate(X_batch):
+            for X_i in X_batch:
                 rewards_i, values_i = [], []
                 for action in rubiks_cube.actions:
                     rubiks_cube_copy = RubiksCube(cube=X_i)
