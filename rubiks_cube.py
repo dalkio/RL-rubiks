@@ -82,6 +82,11 @@ class RubiksCube:
         return np.argmax(cube, axis=-1)
 
     @staticmethod
+    def to_one_hot_cube(cube):
+        assert isinstance(cube, np.ndarray)
+        return (np.arange(len(rc_conf.colors)) == cube[..., None]).astype(int)
+
+    @staticmethod
     def _rotate_helper(matrix, direction):
         if direction == 'd':
             return np.rot90(matrix, k=1)

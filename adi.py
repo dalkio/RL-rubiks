@@ -13,7 +13,8 @@ from rubiks_cube import RubiksCube, RubiksAction
 
 
 class ADI(object):
-    def __init__(self, k: int = 25, l: int = 40000, load_files: Tuple[str, str] = None,
+    def __init__(self, k: int = 25, l: int = 40000,
+                 load_files: Tuple[str, str] = None, cube_dim: int = 3,
                  save_dataset: bool = True, save_model: bool = True,
                  verbose: bool = True, shuffle: bool = True) -> None:
         """
@@ -30,6 +31,7 @@ class ADI(object):
         self.k = k
         self.l = l
         self.load_files = load_files
+        self.cube_dim = cube_dim
         self.save_dataset = save_dataset
         self.save_model = save_model
         self.verbose = verbose
@@ -41,7 +43,7 @@ class ADI(object):
 
         self.logger = self._create_logger()
         if self.load_files:
-            self.k, self.l, self.X, self.weights = self._load_dataset()
+            self.cube_dim, self.k, self.l, self.X, self.weights = self._load_dataset()
         else:
             self.X, self.weights = self._generate_dataset()
         self.model = self._design_model()
@@ -60,25 +62,25 @@ class ADI(object):
         logger.propagate = False
         return logger
 
-    def _load_dataset(self) -> Tuple[int, int, np.ndarray, np.ndarray]:
+    def _load_dataset(self) -> Tuple[int, int, int, np.ndarray, np.ndarray]:
         self.logger.info("Loading dataset...")
         assert len(self.load_files) == 2 and isinstance(self.load_files[0], str) \
             and isinstance(self.load_files[1], str), \
             "Bad format for load_files parameter"
         numbers_parsed = re.findall(r'\d+', self.load_files[0])
-        assert len(numbers_parsed) == 2, \
+        assert len(numbers_parsed) == 4, \
             "Dataset file name incorrect"
-        k, l = [int(digit) for digit in numbers_parsed]
-        self.logger.info("k={0}, l={1}".format(k, l))
+        _, dim, k, l = [int(digit) for digit in numbers_parsed]
+        self.logger.info("dim={0}, k={1}, l={2}".format(dim, k, l))
         X = np.load('data' + os.path.sep + self.load_files[0])
         weights = np.load('data' + os.path.sep + self.load_files[1])
-        return k, l, X, weights
+        return dim, k, l, X, weights
 
     def _generate_dataset(self) -> Tuple[np.ndarray, np.ndarray]:
         self.logger.info("Generating dataset...")
         X, weights = [], []
         for iteration in range(self.l):
-            rubiks_cube = RubiksCube(shuffle=False, verbose=False)
+            rubiks_cube = RubiksCube(dim=self.cube_dim, shuffle=False, verbose=False)
             for shuffle in range(self.k):
                 rubiks_cube.shuffle_cube(n=1)
                 weight = 1 / (shuffle + 1)
@@ -92,15 +94,14 @@ class ADI(object):
             X, weights = X[random_indexes], weights[random_indexes]
         os.makedirs('data', exist_ok=True)
         if self.save_dataset:
-            samples_file = "data/scrambled_cubes_k{0}_l{1}.npy".format(self.k, self.l)
-            weights_file = "data/weights_k{0}_l{1}.npy".format(self.k, self.l)
+            samples_file = "data/scrambled_cubes_{0}x{0}_k{1}_l{2}.npy".format(self.cube_dim, self.k, self.l)
+            weights_file = "data/weights_{0}x{0}_k{1}_l{2}.npy".format(self.cube_dim, self.k, self.l)
             np.save(samples_file, X)
             np.save(weights_file, weights)
         return X, weights
 
-    @staticmethod
-    def _design_model() -> Model:
-        rubiks_cube = RubiksCube()
+    def _design_model(self) -> Model:
+        rubiks_cube = RubiksCube(dim=self.cube_dim)
 
         inputs = Input(shape=rubiks_cube.state_one_hot.shape, name='input')
         x = Flatten()(inputs)
@@ -160,41 +161,49 @@ class ADI(object):
         :param save_frequency: Number of batches between each saving
         """
         self.logger.info("Training model...")
-        rubiks_cube = RubiksCube()
+        rubiks_cube = RubiksCube(dim=self.cube_dim)
         for _ in range(batches_number):
             self.current_iteration += 1
             self.logger.info("Batch number: {0}".format(self.current_iteration))
-            Y_p, Y_v = [], []
             batch_indexes = np.random.choice(range(len(self.X)), size=batch_size, replace=False)
             X_batch, weights_batch = self.X[batch_indexes], self.weights[batch_indexes]
+            rewards, states = [], []
             for X_i in X_batch:
-                rewards_i, values_i = [], []
+                rewards_i, states_i = [], []
                 for action in rubiks_cube.actions:
-                    rubiks_cube_copy = RubiksCube(cube=X_i)
-                    _, reward_a, _, _ = rubiks_cube_copy.step(RubiksAction(action))
-                    (v_x_i_a, p_x_i_a) = self.model.predict(np.expand_dims(rubiks_cube_copy.state_one_hot, axis=0))
+                    states_a, reward_a, _, _ = RubiksCube(dim=self.cube_dim, cube=X_i).step(RubiksAction(action))
                     rewards_i.append(reward_a)
-                    values_i.append(np.asscalar(v_x_i_a))
-                y_p_i = np.ravel(np.eye(1, len(rubiks_cube.actions), np.argmax(np.sum([rewards_i, values_i], axis=0))))
-                y_v_i = np.atleast_1d(np.max(np.sum([rewards_i, values_i], axis=0)))
-                Y_p.append(y_p_i)
-                Y_v.append(y_v_i)
-            Y_p, Y_v = np.asarray(Y_p), np.asarray(Y_v)
+                    states_i.append(RubiksCube.to_one_hot_cube(states_a))
+                rewards.append(np.asarray(rewards_i))
+                states.append(np.asarray(states_i))
+
+            rewards, states = np.asarray(rewards), np.asarray(states)
+            states = states.reshape(-1, *states.shape[2:])
+
+            (values, _) = self.model.predict(states)
+            values = values.reshape((batch_size, len(rubiks_cube.actions)))
+
+            Y_v = np.max(rewards + values, axis=1)
+            Y_p = np.eye(len(rubiks_cube.actions))[np.argmax(rewards + values, axis=1)]
+
             self.model.fit(
                 {'input': X_batch},
                 {'policy_output': Y_p, 'value_output': Y_v},
                 sample_weight={'policy_output': weights_batch, 'value_output': weights_batch},
                 epochs=epochs_per_batch
             )
+
             if self.save_model:
                 if self.current_iteration%save_frequency == 0:
-                    filename = "data/model_k{0}_l{1}_iter{2}".format(self.k, self.l, self.current_iteration)
+                    filename = "data/model_{0}x{0}_k{1}_l{2}_iter{3}".format(
+                        self.cube_dim, self.k, self.l, self.current_iteration
+                    )
                     self.save_trained_model(filename)
 
     def estimate_naive_accuracy(self, depth, iterations):
         score = 0
         for iteration in range(iterations):
-            rubiks = RubiksCube(shuffle=False)
+            rubiks = RubiksCube(dim=self.cube_dim, shuffle=False)
             inverse_previous_action_idx = None
             for depth_i in range(depth):
                 action_idx = random.choice(
