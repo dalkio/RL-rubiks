@@ -3,6 +3,7 @@ import sys
 import os
 import re
 import random
+import datetime
 import numpy as np
 from typing import Tuple
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -16,6 +17,7 @@ class ADI(object):
     def __init__(self, k: int = 25, l: int = 40000,
                  load_files: Tuple[str, str] = None, cube_dim: int = 3,
                  save_dataset: bool = True, save_model: bool = True,
+                 save_log: bool = True,
                  verbose: bool = True, shuffle: bool = True) -> None:
         """
         Autodidactic Iteration Algorithm for Rubik's Cube solving using reinforcement learning
@@ -25,6 +27,7 @@ class ADI(object):
         :param load_files: Tuple of dataset and weights filenames
         :param save_dataset: Boolean for saving or not the created dataset
         :param save_model: Boolean for saving or not the trained model
+        :param save_log: Boolean for logging or not estimated accuracies
         :param verbose: Verbosity parameter
         :param shuffle: Dataset shuffle parameter
         """
@@ -34,6 +37,7 @@ class ADI(object):
         self.cube_dim = cube_dim
         self.save_dataset = save_dataset
         self.save_model = save_model
+        self.save_log = save_log
         self.verbose = verbose
         self.shuffle = shuffle
 
@@ -153,12 +157,13 @@ class ADI(object):
         self.current_iteration = current_iteration
 
     def train(self, batch_size: int = 1000, batches_number: int = 5, epochs_per_batch: int = 1,
-              save_frequency: int = 10) -> None:
+              save_frequency: int = 10, log_frequency: int = 5) -> None:
         """
         :param batch_size: Number of cubes for a batch for one pass
         :param batches_number: Number of total epochs
         :param epochs_per_batch: Number of epochs for one batch
         :param save_frequency: Number of batches between each saving
+        :param log_frequency: Number of batches between each logging
         """
         self.logger.info("Training model...")
         rubiks_cube = RubiksCube(dim=self.cube_dim)
@@ -192,7 +197,19 @@ class ADI(object):
                 sample_weight={'policy_output': weights_batch, 'value_output': weights_batch},
                 epochs=epochs_per_batch
             )
-
+            if self.save_log:
+                if self.current_iteration%log_frequency == 0:
+                    os.makedirs('log', exist_ok=True)
+                    now = datetime.datetime.today().strftime('%Y-%m-%d')
+                    filename = 'log/{0}.log'.format(now)
+                    precision_iter = 500
+                    acc = np.around(np.mean([
+                        self.estimate_naive_accuracy(depth=i, iterations=precision_iter) for i in range(1, self.k+1)
+                    ]), decimals=5)
+                    with open(filename, 'a') as f:
+                        f.write('model_{0}x{0}_k{1}_l{2}_iter{3}: {4}\n'.format(
+                        self.cube_dim, self.k, self.l, self.current_iteration, acc
+                        ))
             if self.save_model:
                 if self.current_iteration%save_frequency == 0:
                     filename = "data/model_{0}x{0}_k{1}_l{2}_iter{3}".format(
