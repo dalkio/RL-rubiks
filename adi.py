@@ -85,8 +85,14 @@ class ADI(object):
         X, weights = [], []
         for iteration in range(self.l):
             rubiks_cube = RubiksCube(dim=self.cube_dim, shuffle=False, verbose=False)
+            inverse_previous_action_idx = None
             for shuffle in range(self.k):
-                rubiks_cube.shuffle_cube(n=1)
+                action_idx = random.choice(
+                    [idx for idx in range(len(rubiks_cube.actions)) if idx != inverse_previous_action_idx]
+                )
+                action = RubiksAction(rubiks_cube.actions[action_idx])
+                rubiks_cube.step(action)
+                inverse_previous_action_idx = rubiks_cube.index_actions[str(action.get_inverse_action())]
                 weight = 1 / (shuffle + 1)
                 X.append(rubiks_cube.state_one_hot)
                 weights.append(weight)
