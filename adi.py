@@ -204,11 +204,11 @@ class ADI(object):
                     now = datetime.datetime.today().strftime('%Y-%m-%d')
                     filename = 'log/{0}.log'.format(now)
                     precision_iter = 500
-                    acc = np.around(np.mean([
+                    acc = np.mean([
                         self.estimate_naive_accuracy(depth=i, iterations=precision_iter) for i in range(1, self.k+1)
-                    ]), decimals=5)
+                    ])
                     with open(filename, 'a') as f:
-                        f.write('{0} - epochs{1}_bs{2}_dim{3}x{3}_k{4}_l{5}_iter{6}: loss={7}, acc={8}\n'.format(
+                        f.write('{0} - epochs{1}_bs{2}_dim{3}x{3}_k{4}_l{5}_iter{6}: loss={7:.5f}, acc={8:.5f}\n'.format(
                             datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                             epochs_per_batch, batch_size,
                             self.cube_dim, self.k, self.l, self.current_iteration,
