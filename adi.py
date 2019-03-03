@@ -16,7 +16,7 @@ from rubiks_cube import RubiksCube, RubiksAction
 class ADI(object):
     def __init__(self, k: int = 25, l: int = 40000,
                  load_files: Tuple[str, str] = None, cube_dim: int = 3,
-                 save_dataset: bool = True, save_model: bool = True,
+                 create_dataset: bool = True, save_dataset: bool = True, save_model: bool = True,
                  save_log: bool = True,
                  verbose: bool = True, shuffle: bool = True) -> None:
         """
@@ -25,8 +25,10 @@ class ADI(object):
         :param k: Number of scrambles from the solved state to generate a sequence of cubes
         :param l: Number of sequences generated
         :param load_files: Tuple of dataset and weights filenames
-        :param save_dataset: Boolean for saving or not the created dataset
-        :param save_model: Boolean for saving or not the trained model
+        :param cube_dim: Dimension of cubes
+        :param create_dataset: If true a full dataset if generated in memory using k and l parameters
+        :param save_dataset: If true the created dataset is saved on disk
+        :param save_model: If true the trained model is saved on disk
         :param save_log: Boolean for logging or not estimated accuracies
         :param verbose: Verbosity parameter
         :param shuffle: Dataset shuffle parameter
@@ -48,7 +50,7 @@ class ADI(object):
         self.logger = self._create_logger()
         if self.load_files:
             self.cube_dim, self.k, self.l, self.X, self.weights = self._load_dataset()
-        else:
+        elif self.create_dataset:
             self.X, self.weights = self._generate_dataset(k=self.k, l=self.l, save_dataset=self.save_dataset)
         self.model = self._design_model()
 
@@ -204,9 +206,10 @@ class ADI(object):
                 X_batch, weights_batch = self._generate_dataset(k=k, l=l, save_dataset=False)
                 batch_size = len(X_batch)
             else:
-                k, l, X, weights = self.k, self.l, self.X, self.weights
-                batch_indexes = np.random.choice(range(len(X)), size=batch_size, replace=False)
-                X_batch, weights_batch = X[batch_indexes], weights[batch_indexes]
+                assert self.X is not None and self.weights is not None
+                k, l = self.k, self.l
+                batch_indexes = np.random.choice(range(len(self.X)), size=batch_size, replace=False)
+                X_batch, weights_batch = self.X[batch_indexes], self.weights[batch_indexes]
             rewards, states = [], []
             for X_i in X_batch:
                 rewards_i, states_i = [], []
