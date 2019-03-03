@@ -49,11 +49,15 @@ class ADI(object):
         if self.load_files:
             self.cube_dim, self.k, self.l, self.X, self.weights = self._load_dataset()
         else:
-            self.X, self.weights = self._generate_dataset()
+            self.X, self.weights = self._generate_dataset(k=self.k, l=self.l, save_dataset=self.save_dataset)
         self.model = self._design_model()
 
     @staticmethod
     def _create_logger() -> logging.Logger:
+        """
+        Logger creator private method
+        :return: logger
+        """
         logger = logging.getLogger(__name__)
         formatter = logging.Formatter("%(asctime)s — %(funcName)s() — %(levelname)s — %(message)s")
         if logger.handlers:
@@ -67,6 +71,10 @@ class ADI(object):
         return logger
 
     def _load_dataset(self) -> Tuple[int, int, int, np.ndarray, np.ndarray]:
+        """
+        Dataset loading private method
+        :return: (dim, k, l, X, weights)
+        """
         self.logger.info("Loading dataset...")
         assert len(self.load_files) == 2 and isinstance(self.load_files[0], str) \
             and isinstance(self.load_files[1], str), \
@@ -80,13 +88,22 @@ class ADI(object):
         weights = np.load('data' + os.path.sep + self.load_files[1])
         return dim, k, l, X, weights
 
-    def _generate_dataset(self) -> Tuple[np.ndarray, np.ndarray]:
+    def _generate_dataset(self, k: int = 25, l: int = 40000, save_dataset: bool = True
+                          ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Dataset generation private method
+        Some parameters are passed here to make possible online dataset generation in the train method
+        :param k: Number of scrambles from the solved state to generate a sequence of cubes
+        :param l: Number of sequences generated
+        :param save_dataset: Boolean for saving or not the created dataset
+        :return: (X, weights)
+        """
         self.logger.info("Generating dataset...")
         X, weights = [], []
-        for iteration in range(self.l):
+        for iteration in range(l):
             rubiks_cube = RubiksCube(dim=self.cube_dim, shuffle=False, verbose=False)
             inverse_previous_action_idx = None
-            for shuffle in range(self.k):
+            for shuffle in range(k):
                 action_idx = random.choice(
                     [idx for idx in range(len(rubiks_cube.actions)) if idx != inverse_previous_action_idx]
                 )
@@ -96,16 +113,16 @@ class ADI(object):
                 weight = 1 / (shuffle + 1)
                 X.append(rubiks_cube.state_one_hot)
                 weights.append(weight)
-            if self.verbose and iteration % (self.l / 10) == 0:
-                self.logger.info("{0:.2f}%".format((iteration / self.l) * 100))
+            if self.verbose and iteration % (l / 10) == 0:
+                self.logger.info("{0:.2f}%".format((iteration / l) * 100))
         X, weights = np.asarray(X), np.asarray(weights)
         if self.shuffle:
-            random_indexes = np.random.permutation(range(self.l * self.k))
+            random_indexes = np.random.permutation(range(l * k))
             X, weights = X[random_indexes], weights[random_indexes]
         os.makedirs('data', exist_ok=True)
-        if self.save_dataset:
-            samples_file = "data/scrambled_cubes_{0}x{0}_k{1}_l{2}.npy".format(self.cube_dim, self.k, self.l)
-            weights_file = "data/weights_{0}x{0}_k{1}_l{2}.npy".format(self.cube_dim, self.k, self.l)
+        if save_dataset:
+            samples_file = "data/scrambled_cubes_{0}x{0}_k{1}_l{2}.npy".format(self.cube_dim, k, l)
+            weights_file = "data/weights_{0}x{0}_k{1}_l{2}.npy".format(self.cube_dim, k, l)
             np.save(samples_file, X)
             np.save(weights_file, weights)
         return X, weights
@@ -162,22 +179,34 @@ class ADI(object):
         self.model = loaded_model
         self.current_iteration = current_iteration
 
-    def train(self, batch_size: int = 1000, batches_number: int = 5, epochs_per_batch: int = 1,
+    def train(self, generate_online_dataset: bool = False,
+              k: int = None, l: int = None,
+              batch_size: int = 1000, batches_number: int = 5, epochs_per_batch: int = 1,
               save_frequency: int = 10, log_frequency: int = 5) -> None:
         """
-        :param batch_size: Number of cubes for a batch for one pass
+        :param generate_online_dataset: If true, generate its own dataset for each batch
+        :param k: k parameter per batch, only used if generate_online_dataset is True
+        :param l: l parameter per batch, only used if generate_online_dataset is True
+        :param batch_size: Number of cubes for a batch for one pass, only used if generate_online_dataset is False
         :param batches_number: Number of total epochs
         :param epochs_per_batch: Number of epochs for one batch
         :param save_frequency: Number of batches between each saving
         :param log_frequency: Number of batches between each logging
+        :return: None
         """
         self.logger.info("Training model...")
         rubiks_cube = RubiksCube(dim=self.cube_dim)
         for _ in range(batches_number):
             self.current_iteration += 1
             self.logger.info("Batch number: {0}".format(self.current_iteration))
-            batch_indexes = np.random.choice(range(len(self.X)), size=batch_size, replace=False)
-            X_batch, weights_batch = self.X[batch_indexes], self.weights[batch_indexes]
+            if generate_online_dataset:
+                assert k is not None and l is not None
+                X_batch, weights_batch = self._generate_dataset(k=k, l=l, save_dataset=False)
+                batch_size = len(X_batch)
+            else:
+                k, l, X, weights = self.k, self.l, self.X, self.weights
+                batch_indexes = np.random.choice(range(len(X)), size=batch_size, replace=False)
+                X_batch, weights_batch = X[batch_indexes], weights[batch_indexes]
             rewards, states = [], []
             for X_i in X_batch:
                 rewards_i, states_i = [], []
@@ -211,23 +240,29 @@ class ADI(object):
                     filename = 'log/{0}.log'.format(now)
                     precision_iter = 500
                     acc = np.mean([
-                        self.estimate_naive_accuracy(depth=i, iterations=precision_iter) for i in range(1, self.k+1)
+                        self.estimate_naive_accuracy(depth=i, iterations=precision_iter) for i in range(1, k+1)
                     ])
                     with open(filename, 'a') as f:
-                        f.write('{0} - epochs{1}_bs{2}_dim{3}x{3}_k{4}_l{5}_iter{6}: loss={7:.5f}, acc={8:.5f}\n'.format(
-                            datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            epochs_per_batch, batch_size,
-                            self.cube_dim, self.k, self.l, self.current_iteration,
-                            loss, acc
+                        f.write(
+                            '{0} - epochs{1}_bs{2}_dim{3}x{3}_k{4}_l{5}_iter{6}: loss={7:.5f}, acc={8:.5f}\n'.format(
+                                datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                epochs_per_batch, batch_size,
+                                self.cube_dim, k, l, self.current_iteration,
+                                loss, acc
                         ))
             if self.save_model:
                 if self.current_iteration%save_frequency == 0:
                     filename = "data/model_{0}x{0}_k{1}_l{2}_iter{3}".format(
-                        self.cube_dim, self.k, self.l, self.current_iteration
+                        self.cube_dim, k, l, self.current_iteration
                     )
                     self.save_trained_model(filename)
 
-    def estimate_naive_accuracy(self, depth, iterations):
+    def estimate_naive_accuracy(self, depth: int, iterations: int) -> float:
+        """
+        :param depth: Maximum scramble depth in the accuracy approximation
+        :param iterations: Number of iterations, a higher value leads to a better accuracy approximation
+        :return: Approximated accuracy
+        """
         score = 0
         for iteration in range(iterations):
             rubiks = RubiksCube(dim=self.cube_dim, shuffle=False)
