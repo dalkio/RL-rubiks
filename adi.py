@@ -207,8 +207,10 @@ class ADI(object):
                         self.estimate_naive_accuracy(depth=i, iterations=precision_iter) for i in range(1, self.k+1)
                     ]), decimals=5)
                     with open(filename, 'a') as f:
-                        f.write('model_{0}x{0}_k{1}_l{2}_iter{3}: {4}\n'.format(
-                        self.cube_dim, self.k, self.l, self.current_iteration, acc
+                        f.write('{0} - model_{1}x{1}_k{2}_l{3}_iter{4}: {5}\n'.format(
+                        datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        self.cube_dim, self.k, self.l, self.current_iteration,
+                        acc
                         ))
             if self.save_model:
                 if self.current_iteration%save_frequency == 0:
