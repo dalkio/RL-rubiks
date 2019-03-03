@@ -67,6 +67,11 @@ class RubiksCube:
                 print('Incorrect cube format!')
         if shuffle:
             self.shuffle_cube()
+
+    def __eq__(self, other):
+        if type(other) is type(self):
+            return self.cube == other.cube
+        return False
     
     @property
     def state(self):
@@ -85,6 +90,19 @@ class RubiksCube:
     def to_one_hot_cube(cube):
         assert isinstance(cube, np.ndarray)
         return (np.arange(len(rc_conf.colors)) == cube[..., None]).astype(int)
+
+    @staticmethod
+    def get_action_from_two_states(state_1, state_2):
+        assert isinstance(state_1, np.ndarray) and isinstance(state_2, np.ndarray)
+        assert len(state_1.shape) == len(state_2.shape) == 3
+        rubiks_1 = RubiksCube(dim=state_1.shape[-1], cube=state_1)
+        for action in rubiks_1.actions:
+            rubiks_1_copy = RubiksCube(cube=rubiks_1.cube)
+            rubiks_action = RubiksAction(action)
+            new_state, _, _, _ = rubiks_1_copy.step(rubiks_action)
+            if np.array_equal(new_state, state_2):
+                return rubiks_action
+        return None
 
     @staticmethod
     def _rotate_helper(matrix, direction):
