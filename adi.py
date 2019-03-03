@@ -37,6 +37,7 @@ class ADI(object):
         self.l = l
         self.load_files = load_files
         self.cube_dim = cube_dim
+        self.create_dataset = create_dataset
         self.save_dataset = save_dataset
         self.save_model = save_model
         self.save_log = save_log
