@@ -191,12 +191,13 @@ class ADI(object):
             Y_v = np.max(rewards + values, axis=1)
             Y_p = np.eye(len(rubiks_cube.actions))[np.argmax(rewards + values, axis=1)]
 
-            self.model.fit(
+            history = self.model.fit(
                 {'input': X_batch},
                 {'policy_output': Y_p, 'value_output': Y_v},
                 sample_weight={'policy_output': weights_batch, 'value_output': weights_batch},
                 epochs=epochs_per_batch
             )
+            loss = history.history['loss'][-1]
             if self.save_log:
                 if self.current_iteration%log_frequency == 0:
                     os.makedirs('log', exist_ok=True)
@@ -207,10 +208,11 @@ class ADI(object):
                         self.estimate_naive_accuracy(depth=i, iterations=precision_iter) for i in range(1, self.k+1)
                     ]), decimals=5)
                     with open(filename, 'a') as f:
-                        f.write('{0} - model_{1}x{1}_k{2}_l{3}_iter{4}: {5}\n'.format(
-                        datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        self.cube_dim, self.k, self.l, self.current_iteration,
-                        acc
+                        f.write('{0} - epochs{1}_bs{2}_dim{3}x{3}_k{4}_l{5}_iter{6}: loss={7}, acc={8}\n'.format(
+                            datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            epochs_per_batch, batch_size,
+                            self.cube_dim, self.k, self.l, self.current_iteration,
+                            loss, acc
                         ))
             if self.save_model:
                 if self.current_iteration%save_frequency == 0:
