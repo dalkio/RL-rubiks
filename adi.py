@@ -7,6 +7,7 @@ import datetime
 import numpy as np
 from typing import Tuple
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+from keras import optimizers
 from keras.layers import Input, Dense, Flatten
 from keras.models import Model
 from keras.models import model_from_json
@@ -14,7 +15,7 @@ from rubiks_cube import RubiksCube, RubiksAction
 
 
 class ADI(object):
-    def __init__(self, k: int = 25, l: int = 40000,
+    def __init__(self, k: int = 25, l: int = 40000, initial_lr: float = 1e-5,
                  load_files: Tuple[str, str] = None, cube_dim: int = 3,
                  create_dataset: bool = True, save_dataset: bool = True, save_model: bool = True,
                  save_log: bool = True,
@@ -24,6 +25,7 @@ class ADI(object):
         https://arxiv.org/pdf/1805.07470.pdf
         :param k: Number of scrambles from the solved state to generate a sequence of cubes
         :param l: Number of sequences generated
+        :param initial_lr: Initial learning rate
         :param load_files: Tuple of dataset and weights filenames
         :param cube_dim: Dimension of cubes
         :param create_dataset: If true a full dataset if generated in memory using k and l parameters
@@ -35,6 +37,7 @@ class ADI(object):
         """
         self.k = k
         self.l = l
+        self.initial_lr = initial_lr
         self.load_files = load_files
         self.cube_dim = cube_dim
         self.create_dataset = create_dataset
@@ -146,9 +149,10 @@ class ADI(object):
             'value_output': 'mean_squared_error',
             'policy_output': 'categorical_crossentropy'
         }
+        opt = optimizers.Adam(lr=self.initial_lr)
 
         model = Model(inputs=inputs, outputs=[v, p])
-        model.compile(optimizer='rmsprop', loss=losses)
+        model.compile(optimizer=opt, loss=losses)
         return model
 
     def save_trained_model(self, filename: str) -> None:
@@ -184,12 +188,16 @@ class ADI(object):
 
     def train(self, generate_online_dataset: bool = False,
               k: int = None, l: int = None,
+              lr_decay: bool = True, lr_decay_gamma: float = 0.95, lr_decay_freq = 1000,
               batch_size: int = 1000, batches_number: int = 5, epochs_per_batch: int = 1,
               save_frequency: int = 10, log_frequency: int = 5) -> None:
         """
         :param generate_online_dataset: If true, generate its own dataset for each batch
         :param k: k parameter per batch, only used if generate_online_dataset is True
         :param l: l parameter per batch, only used if generate_online_dataset is True
+        :param lr_decay: Enable learning rate decay between batches
+        :param lr_decay_gamma: Learning rate gamma, only used if lr_decay is True
+        :param lr_decay_freq: Learning rate updates interval, only used if lr_decay is True
         :param batch_size: Number of cubes for a batch for one pass, only used if generate_online_dataset is False
         :param batches_number: Number of total epochs
         :param epochs_per_batch: Number of epochs for one batch
@@ -229,6 +237,13 @@ class ADI(object):
 
             Y_v = np.max(rewards + values, axis=1)
             Y_p = np.eye(len(rubiks_cube.actions))[np.argmax(rewards + values, axis=1)]
+
+            if lr_decay:
+                if self.current_iteration%lr_decay_freq == 0:
+                    current_lr = self.model.lr.get_value()
+                    new_lr = current_lr * lr_decay_gamma
+                    self.model.lr.set_value(new_lr)
+                    self.logger.info("Changed LR from {0:.5f} to {1:.5f}".format(current_lr, new_lr))
 
             history = self.model.fit(
                 {'input': X_batch},
