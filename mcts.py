@@ -138,5 +138,5 @@ class MCTS:
         for _ in range(resolutions_number):
             rubiks = RubiksCube(shuffle=False)
             rubiks.shuffle_cube(n=shuffle_depth)
-            score += self.search(rubiks, max_iterations)
-        return score
+            score += bool(self.search(rubiks, max_iterations))
+        return score/resolutions_number
