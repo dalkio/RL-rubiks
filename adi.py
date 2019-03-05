@@ -7,6 +7,7 @@ import datetime
 import numpy as np
 from typing import Tuple
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+import keras.backend as K
 from keras import optimizers
 from keras.layers import Input, Dense, Flatten
 from keras.models import Model
@@ -240,9 +241,9 @@ class ADI(object):
 
             if lr_decay:
                 if self.current_iteration%lr_decay_freq == 0:
-                    current_lr = self.model.lr.get_value()
+                    current_lr = K.eval(self.model.optimizer.lr)
                     new_lr = current_lr * lr_decay_gamma
-                    self.model.lr.set_value(new_lr)
+                    K.set_value(self.model.optimizer.lr, new_lr)
                     self.logger.info("Changed LR from {0:.5f} to {1:.5f}".format(current_lr, new_lr))
 
             history = self.model.fit(
@@ -261,13 +262,13 @@ class ADI(object):
                     acc = np.mean([
                         self.estimate_naive_accuracy(depth=i, iterations=precision_iter) for i in range(1, k+1)
                     ])
+                    s_log = '{0} - epochs{1}_bs{2}_dim{3}x{3}_k{4}_l{5}_lr{6}_iter{7:.5f}: loss={8:.5f}, acc={9:.5f}\n'
                     with open(filename, 'a') as f:
-                        s_log = '{0} - epochs{1}_bs{2}_dim{3}x{3}_k{4}_l{5}_lr{6}_iter{7}: loss={8:.5f}, acc={9:.5f}\n'
                         f.write(
                             s_log.format(
                                 datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                                 epochs_per_batch, batch_size,
-                                self.cube_dim, k, l, self.model.lr.get_value(), self.current_iteration,
+                                self.cube_dim, k, l, K.eval(self.model.optimizer.lr), self.current_iteration,
                                 loss, acc
                             )
                         )
