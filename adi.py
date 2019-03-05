@@ -244,7 +244,7 @@ class ADI(object):
                     current_lr = K.eval(self.model.optimizer.lr)
                     new_lr = current_lr * lr_decay_gamma
                     K.set_value(self.model.optimizer.lr, new_lr)
-                    self.logger.info("Changed LR from {0:.5f} to {1:.5f}".format(current_lr, new_lr))
+                    self.logger.info("Changed LR from {0:.3E} to {1:.3E}".format(current_lr, new_lr))
 
             history = self.model.fit(
                 {'input': X_batch},
@@ -262,7 +262,7 @@ class ADI(object):
                     acc = np.mean([
                         self.estimate_naive_accuracy(depth=i, iterations=precision_iter) for i in range(1, k+1)
                     ])
-                    s_log = '{0} - epochs{1}_bs{2}_dim{3}x{3}_k{4}_l{5}_lr{6:.5f}_iter{7}: loss={8:.5f}, acc={9:.5f}\n'
+                    s_log = '{0} - epochs{1}_bs{2}_dim{3}x{3}_k{4}_l{5}_lr{6:.1E}_iter{7}: loss={8:.5f}, acc={9:.5f}\n'
                     with open(filename, 'a') as f:
                         f.write(
                             s_log.format(
