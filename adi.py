@@ -262,13 +262,15 @@ class ADI(object):
                         self.estimate_naive_accuracy(depth=i, iterations=precision_iter) for i in range(1, k+1)
                     ])
                     with open(filename, 'a') as f:
+                        s_log = '{0} - epochs{1}_bs{2}_dim{3}x{3}_k{4}_l{5}_lr{6}_iter{7}: loss={8:.5f}, acc={9:.5f}\n'
                         f.write(
-                            '{0} - epochs{1}_bs{2}_dim{3}x{3}_k{4}_l{5}_iter{6}: loss={7:.5f}, acc={8:.5f}\n'.format(
+                            s_log.format(
                                 datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                                 epochs_per_batch, batch_size,
-                                self.cube_dim, k, l, self.current_iteration,
+                                self.cube_dim, k, l, self.model.lr.get_value(), self.current_iteration,
                                 loss, acc
-                        ))
+                            )
+                        )
             if self.save_model:
                 if self.current_iteration%save_frequency == 0:
                     filename = "data/model_{0}x{0}_k{1}_l{2}_iter{3}".format(
