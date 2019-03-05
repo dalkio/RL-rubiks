@@ -262,7 +262,7 @@ class ADI(object):
                     acc = np.mean([
                         self.estimate_naive_accuracy(depth=i, iterations=precision_iter) for i in range(1, k+1)
                     ])
-                    s_log = '{0} - epochs{1}_bs{2}_dim{3}x{3}_k{4}_l{5}_lr{6}_iter{7:.5f}: loss={8:.5f}, acc={9:.5f}\n'
+                    s_log = '{0} - epochs{1}_bs{2}_dim{3}x{3}_k{4}_l{5}_lr{6:.5f}_iter{7}: loss={8:.5f}, acc={9:.5f}\n'
                     with open(filename, 'a') as f:
                         f.write(
                             s_log.format(
